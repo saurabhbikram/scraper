@@ -47,5 +47,11 @@ from crawler_config import requests # CReq object
 
 from crawler import crawl_urls
 
-res = crawl_urls(requests.get, URLS_CRAWL, threads=2)
+def func(url):
+    page = requests.get(url)
+    # do something with the page, eg extraction etc
+    res = page.xpath('//text())
+    return res
+
+crawl_urls(func, URLS_CRAWL, threads=2)
 ```

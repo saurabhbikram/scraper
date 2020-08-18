@@ -1,6 +1,7 @@
 import sys
 sys.path.append("..")
 from cached_requests import *
+from crawler import *
 import shutil
 
 PROXIES = ['63.141.241.98:16001', '163.172.36.211:16001', '69.30.240.226:15001', '195.154.255.118:15001']
@@ -10,6 +11,16 @@ logging.basicConfig()
 engine = db.create_engine('postgresql://prop@localhost/crawler_test')
 crawler = CReq(engine, cache_loc='tmp', proxies=None)
 crawler_proxy = CReq(engine, cache_loc='tmp', proxies = PROXIES)
+
+def func(x):
+    return crawler_proxy.get(x, max_age_days=0)
+
+
+def test_multi_proc():
+    list_of_urls = ["https://www.bbc.co.uk/sport",
+    "http://www.bbc.co.uk/weather", "https://uk.yahoo.com"]
+
+    crawl_urls(func, list_of_urls, threads=2)
 
 def test_proxy():
     res = crawler.get("http://httpbin.org/ip", max_age_days=0)
@@ -48,4 +59,6 @@ def test_db_read_nofile():
     res = crawler.get("https://stackoverflow.com/questions/19476816/creating-an-empty-object-in-python")
     shutil.rmtree('tmp')
     assert res.status_code == 200
+
+
 
