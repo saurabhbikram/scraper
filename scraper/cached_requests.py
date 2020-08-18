@@ -177,23 +177,3 @@ if __name__ == "__main__":
     url = "https://stackoverflow.com/questions/19476816/creating-an-empty-object-in-python"
     res = crawler.get(url)
 
-    headers = {
-    "Host": "www.epcregister.com",
-    "Connection": "keep-alive",
-    "Cache-Control": "max-age=0",
-    "Upgrade-Insecure-Requests": "1",
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.105 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
-    "Sec-Fetch-Site": "same-origin",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-User": "?1",
-    "Sec-Fetch-Dest": "document",
-    "Referer": "https://www.epcregister.com/reportSearchAddressTerms.html",
-    "Accept-Encoding": "gzip, deflate, br",
-    'Accept-Language': "en-GB,en-US;q=0.9,en;q=0.8",
-    }
-
-    r = crawler.post('https://www.epcregister.com/reportSearchAddressTerms.html', data = {'accept':'Accept Terms'}, request_headers=headers)
-    r = crawler.post("https://www.epcregister.com/reportSearchAddressByPostcode.html", data={"postcode":'ec1m 6ad'}, request_headers=headers)
-    print(res)
-
