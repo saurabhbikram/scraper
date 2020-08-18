@@ -1,6 +1,6 @@
 # Scraper
 
-Easier scraping of web data.
+Light weight scraper with database caching
 
 ## Motivation
 A major pain point in doing data science on web data is the parsing of html into structured data. 
