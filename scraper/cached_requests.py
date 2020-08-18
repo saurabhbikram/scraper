@@ -168,12 +168,3 @@ class CReq():
             res.post_url = url
             self.save_db(res, post_msg=data)
         return res
-
-
-if __name__ == "__main__":
-    log.setLevel(logging.DEBUG)
-    engine = db.create_engine(config.TEST_DB)
-    crawler = Crawler(engine, cache_loc='tmp')
-    url = "https://stackoverflow.com/questions/19476816/creating-an-empty-object-in-python"
-    res = crawler.get(url)
-
