@@ -8,7 +8,7 @@ PROXIES = ['63.141.241.98:16001', '163.172.36.211:16001', '69.30.240.226:15001',
 logging.basicConfig()
 
 engine = db.create_engine('postgresql://prop@localhost/crawler_test')
-crawler = Crawler(engine, cache_loc='tmp', proxies=None)
+crawler = CReq(engine, cache_loc='tmp', proxies=None)
 crawler_proxy = CReq(engine, cache_loc='tmp', proxies = PROXIES)
 
 def test_proxy():
