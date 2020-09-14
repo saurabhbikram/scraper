@@ -1,2 +1,3 @@
 sqlalchemy
 s3fs
+psycopg2-binary

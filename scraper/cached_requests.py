@@ -8,8 +8,6 @@ from datetime import datetime, timedelta
 import s3fs
 
 PROFILE = os.getenv('AWSACC')
-if PROFILE is None: PROFILE = "default" 
-
 
 logging.basicConfig()
 log = logging.getLogger()
