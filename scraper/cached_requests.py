@@ -7,6 +7,10 @@ import time, json
 from datetime import datetime, timedelta
 import s3fs
 
+PROFILE = os.getenv('AWSACC')
+if PROFILE is None: PROFILE = "default" 
+
+
 logging.basicConfig()
 log = logging.getLogger()
 
@@ -17,7 +21,7 @@ class CReq():
     def __init__(self, engine: db.engine=None, cache_loc: str="", proxies: List[str]=None):
         super().__init__()
         self.dbs = {'engine':engine}
-        self.s3 = s3fs.S3FileSystem()
+        self.s3 = s3fs.S3FileSystem(profile=PROFILE)
         if engine is not None:
             self.dbs['metadata'] = db.MetaData()
             self.dbs['pages'] = db.Table('pages', self.dbs['metadata'], autoload=True, autoload_with=engine)

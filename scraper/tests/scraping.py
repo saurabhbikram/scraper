@@ -3,13 +3,16 @@ sys.path.append("..")
 from cached_requests import *
 from crawler import *
 import shutil
+import os
 
 S3PATH = 's3://sbcrawl-test/'
 PROXIES = ['63.141.241.98:16001', '163.172.36.211:16001', '69.30.240.226:15001', '195.154.255.118:15001']
+DBHOST = os.getenv('DBHOST')
+if DBHOST is None: DBHOST = "localhost" 
 
 logging.basicConfig()
 
-engine = db.create_engine('postgresql://prop@localhost/crawler_test')
+engine = db.create_engine(f'postgresql://prop@{DBHOST}/crawler_test')
 crawler = CReq(engine, cache_loc=S3PATH, proxies=None)
 crawler_proxy = CReq(engine, cache_loc=S3PATH, proxies = PROXIES)
 
