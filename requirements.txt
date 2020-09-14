@@ -1,1 +1,2 @@
 sqlalchemy
+s3fs
