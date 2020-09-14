@@ -17,7 +17,7 @@ class CReq():
     def __init__(self, engine: db.engine=None, cache_loc: str="", proxies: List[str]=None):
         super().__init__()
         self.dbs = {'engine':engine}
-        self.s3 = s3fs.S3FileSystem(profile='sb')
+        self.s3 = s3fs.S3FileSystem()
         if engine is not None:
             self.dbs['metadata'] = db.MetaData()
             self.dbs['pages'] = db.Table('pages', self.dbs['metadata'], autoload=True, autoload_with=engine)

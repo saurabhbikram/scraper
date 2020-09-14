@@ -9,9 +9,6 @@ PROXIES = ['63.141.241.98:16001', '163.172.36.211:16001', '69.30.240.226:15001',
 
 logging.basicConfig()
 
-import s3fs
-fs = s3fs.S3FileSystem(profile='sb')
-
 engine = db.create_engine('postgresql://prop@localhost/crawler_test')
 crawler = CReq(engine, cache_loc=S3PATH, proxies=None)
 crawler_proxy = CReq(engine, cache_loc=S3PATH, proxies = PROXIES)
