@@ -70,9 +70,14 @@ class CReq():
                           )).\
                 order_by(db.desc(pages.columns.date_created))
         self.dbs['engine'].dispose()
-        with self.dbs['engine'].connect() as connection: 
-            qry_exec = connection.execute(query)
-            res = qry_exec.fetchall()
+        while True:
+            try:
+                with self.dbs['engine'].connect() as connection: 
+                    qry_exec = connection.execute(query)
+                    res = qry_exec.fetchall()
+                break
+            except db.exc.OperationalError as e:
+                time.sleep(1)
         
         return res
     
