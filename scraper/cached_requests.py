@@ -14,16 +14,17 @@ log = logging.getLogger()
 def default_engine(host):
     return db.create_engine(host, poolclass=db.pool.NullPool)
 
-aws_session = boto3.session.Session(profile_name=os.getenv('AWSACC'))
-s3 = aws_session.client('s3')
-
 def read_aws(bucket, k):
+    aws_session = boto3.session.Session(profile_name=os.getenv('AWSACC'))
+    s3 = aws_session.client('s3')
     obj = s3.get_object(Bucket=bucket, Key=k)
     with gzip.GzipFile(fileobj=obj["Body"]) as gzipfile:
         content = gzipfile.read()
     return content
 
 def write_aws(bucket, k, content):
+    aws_session = boto3.session.Session(profile_name=os.getenv('AWSACC'))
+    s3 = aws_session.client('s3')
     res_gz = gzip.compress(content)
     res = s3.put_object(Body=res_gz, Bucket=bucket, Key=k)
     assert res['ResponseMetadata']['HTTPStatusCode'] == 200
