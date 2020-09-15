@@ -5,7 +5,7 @@ from crawler import *
 import shutil
 import os
 
-S3PATH = 's3://sbcrawl-test/'
+S3BUCKET = 'sbcrawl-test'
 PROXIES = ['63.141.241.98:16001', '163.172.36.211:16001', '69.30.240.226:15001', '195.154.255.118:15001']
 DBHOST = os.getenv('DBHOST')
 if DBHOST is None: DBHOST = "localhost" 
@@ -13,11 +13,11 @@ if DBHOST is None: DBHOST = "localhost"
 logging.basicConfig()
 
 engine = db.create_engine(f'postgresql://prop@{DBHOST}/crawler_test')
-crawler = CReq(engine, cache_loc=S3PATH, proxies=None)
-crawler_proxy = CReq(engine, cache_loc=S3PATH, proxies = PROXIES)
+crawler = CReq(engine, bucket=S3BUCKET, proxies=None)
+crawler_proxy = CReq(engine, bucket=S3BUCKET, proxies = PROXIES)
 
 def func(x):
-    return crawler_proxy.get(x, max_age_days=0)
+    return crawler.get(x, max_age_days=0)
 
 def test_multi_proc():
     list_of_urls = ["https://www.bbc.co.uk/sport",

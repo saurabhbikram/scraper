@@ -5,9 +5,8 @@ import logging
 from typing import List, Dict
 import time, json
 from datetime import datetime, timedelta
-import s3fs
-
-PROFILE = os.getenv('AWSACC')
+import boto3
+import boto3.session
 
 logging.basicConfig()
 log = logging.getLogger()
@@ -15,17 +14,39 @@ log = logging.getLogger()
 def default_engine(host):
     return db.create_engine(host, poolclass=db.pool.NullPool)
 
+aws_session = boto3.session.Session(profile_name=os.getenv('AWSACC'))
+s3 = aws_session.client('s3')
+
+def read_aws(bucket, k):
+    obj = s3.get_object(Bucket=bucket, Key=k)
+    with gzip.GzipFile(fileobj=obj["Body"]) as gzipfile:
+        content = gzipfile.read()
+    return content
+
+def write_aws(bucket, k, content):
+    res_gz = gzip.compress(content)
+    res = s3.put_object(Body=res_gz, Bucket=bucket, Key=k)
+    assert res['ResponseMetadata']['HTTPStatusCode'] == 200
+
+class DBRequests:
+    def __init__(self, content, status_code, headers, url, date_created):
+        super().__init__()
+        self.content = content
+        self.status_code = status_code
+        self.headers = headers
+        self.url = url
+        self.date_created = date_created
+
 class CReq():
-    def __init__(self, engine: db.engine=None, cache_loc: str="", proxies: List[str]=None):
+    def __init__(self, engine: db.engine=None, bucket: str="sbcrawl-test", proxies: List[str]=None):
         super().__init__()
         self.dbs = {'engine':engine}
-        self.s3 = s3fs.S3FileSystem(profile=PROFILE)
         if engine is not None:
             self.dbs['metadata'] = db.MetaData()
             self.dbs['pages'] = db.Table('pages', self.dbs['metadata'], autoload=True, autoload_with=engine)
         self.proxies = proxies
-        self.cache_loc = cache_loc
         self.requests_session = requests.Session()
+        self.bucket = bucket
     
     def get_proxy(self):
         proxies = self.proxies
@@ -81,18 +102,15 @@ class CReq():
         
         return res
     
-    def read_file(self, id:int, content_ext:str="html"):
-        if self.cache_loc == "": return None
-        path = os.path.join(self.cache_loc, str(id))
+    def read_file(self, id:int):
         res = t = type('', (), {})()
-        res.file_loc = path
+        k = f'{str(id)}.gz.html' # always html even if json
+        res.file_loc = os.path.join(self.bucket, k)
         try:
-            with self.s3.open(f'{path}.gz.{content_ext}', 'rb') as f:
-                g = gzip.GzipFile(fileobj=f)
-                file_content = g.read()
+            file_content = read_aws(self.bucket, k)
             res.content = file_content
             res.status_code = 200
-        except FileNotFoundError as e:
+        except s3.exceptions.NoSuchKey as e:
             log.warning(f"ID {str(id)} not found in store. Will redownload")
             res.status_code = 404
         return res
@@ -114,19 +132,18 @@ class CReq():
             else:
                 content_ext = "html"
             
-            res = self.read_file(db_id, content_ext)
-            if res.status_code == 404: continue
-            res.url = url
-            res.headers = db_headers
-            res.date_created = db_date_created
-            if content_ext == "json":
-                res.json = json.loads(res.content)
-            all_res.append(res)
+            res = self.read_file(db_id)
+            if res.status_code != 404:
+                new_res = DBRequests(content=res.content, status_code=res.status_code, 
+                url=url, headers=db_headers, date_created=db_date_created)
+                if content_ext == "json":
+                    new_res.json = json.loads(res.content)
+
+                all_res.append(new_res)
             
         return all_res
 
     def save_db(self, res, post_msg=None):
-        if self.cache_loc == "": return None
         pages = self.dbs['pages']
         self.dbs['engine'].dispose()
         url_save = res.post_url if hasattr(res,'post_url') else res.url
@@ -138,10 +155,7 @@ class CReq():
             try:
                 dres = connection.execute(query)
                 id_save = dres.fetchone()[0]
-                path = os.path.join(self.cache_loc, str(id_save))
-                with self.s3.open(f'{path}.gz.html', 'wb') as f:
-                    res_gz = gzip.compress(res.content)
-                    f.write(res_gz)
+                write_aws(self.bucket, str(id_save)+'.gz.html',res.content)                
                 trans.commit()
             except:
                 log.warning(f"ID {str(id_save)} could not save, will not commit to db.")
@@ -178,7 +192,7 @@ class CReq():
             www_res = [www_res]
 
         return www_res + db_res
-    
+        
     def post(self, url, data:dict, request_headers=None, force_new=False):
 
         # if no engine specified, act like normal requests
