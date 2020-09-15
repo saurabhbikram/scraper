@@ -14,7 +14,7 @@ log = logging.getLogger()
 def default_engine(host):
     return db.create_engine(host, poolclass=db.pool.NullPool)
 
-aws_session = boto3.session.Session(profile_name='sb')
+aws_session = boto3.session.Session(profile_name=os.getenv('AWSACC'))
 s3 = aws_session.client('s3')
 
 def read_aws(bucket, k):
@@ -27,6 +27,15 @@ def write_aws(bucket, k, content):
     res_gz = gzip.compress(content)
     res = s3.put_object(Body=res_gz, Bucket=bucket, Key=k)
     assert res['ResponseMetadata']['HTTPStatusCode'] == 200
+
+class DBRequests:
+    def __init__(self, content, status_code, headers, url, date_created):
+        super().__init__()
+        self.content = content
+        self.status_code = status_code
+        self.headers = headers
+        self.url = url
+        self.date_created = date_created
 
 class CReq():
     def __init__(self, engine: db.engine=None, bucket: str="sbcrawl-test", proxies: List[str]=None):
@@ -48,15 +57,17 @@ class CReq():
         else: proxy_dict = None
         return proxy_dict
 
-    def get_www(self, url, raise_for_status=True):
+    def get_www(self, url):
         num_tries = 0
         while True:
             try:
                 pxy = self.get_proxy()
                 res = requests.get(url, proxies=pxy)
-                if raise_for_status: res.raise_for_status()
+                # only raise status if code is not 404
+                if res.status_code != 404: res.raise_for_status()
                 break
-            except (requests.exceptions.ProxyError, requests.exceptions.HTTPError, requests.exceptions.SSLError) as e:
+            except (requests.exceptions.ProxyError, requests.exceptions.HTTPError, 
+                    requests.exceptions.SSLError, requests.exceptions.ChunkedEncodingError) as e:
                 log.warning(f"Get {num_tries+1}/10 failed with proxy on {url} and proxy {pxy['http']}")
                 num_tries += 1
                 if num_tries == 9:
@@ -80,22 +91,26 @@ class CReq():
                           )).\
                 order_by(db.desc(pages.columns.date_created))
         self.dbs['engine'].dispose()
-        with self.dbs['engine'].connect() as connection: 
-            qry_exec = connection.execute(query)
-            res = qry_exec.fetchall()
+        while True:
+            try:
+                with self.dbs['engine'].connect() as connection: 
+                    qry_exec = connection.execute(query)
+                    res = qry_exec.fetchall()
+                break
+            except db.exc.OperationalError as e:
+                time.sleep(1)
         
         return res
     
-    def read_file(self, id:int, content_ext:str="html"):
-        path = str(id)
+    def read_file(self, id:int):
         res = t = type('', (), {})()
-        res.file_loc = path
+        k = f'{str(id)}.gz.html' # always html even if json
+        res.file_loc = os.path.join(self.bucket, k)
         try:
-            k = f'{str(id)}.gz.{content_ext}'
             file_content = read_aws(self.bucket, k)
             res.content = file_content
             res.status_code = 200
-        except FileNotFoundError as e:
+        except s3.exceptions.NoSuchKey as e:
             log.warning(f"ID {str(id)} not found in store. Will redownload")
             res.status_code = 404
         return res
@@ -103,7 +118,8 @@ class CReq():
     def get_db(self, url, post_msg=None):
         res_list = self.get_db_id(url, post_msg)
         # TO DO: return multiple objects if more than 1 match
-        for db_id, db_headers, db_date_created in res_list[:1]: 
+        all_res = []
+        for db_id, db_headers, db_date_created in res_list: 
             if db_headers is not None:
                 db_headers = {x.lower().strip():v for x,v in db_headers.items()}
                 if db_headers['content-type'].find('html') > 0:
@@ -116,13 +132,16 @@ class CReq():
             else:
                 content_ext = "html"
             
-            res = self.read_file(db_id, content_ext)
-            res.url = url
-            res.headers = db_headers
-            res.date_created = db_date_created
-            if content_ext == "json":
-                res.json = json.loads(res.content)
-            return res
+            res = self.read_file(db_id)
+            if res.status_code != 404:
+                new_res = DBRequests(content=res.content, status_code=res.status_code, 
+                url=url, headers=db_headers, date_created=db_date_created)
+                if content_ext == "json":
+                    new_res.json = json.loads(res.content)
+
+                all_res.append(new_res)
+            
+        return all_res
 
     def save_db(self, res, post_msg=None):
         pages = self.dbs['pages']
@@ -144,26 +163,36 @@ class CReq():
                 raise
         return None
     
-    def get(self, url, max_age_days=365):
-
+    def get(self, url, max_age_days=365) -> List[object]:
+        """
+        Gets a list of request objects from cache. 
+        If max_age_days is 0, then also fetches the latest from www.
+        The order is based on date fetched, so most recent is always first
+        """
         # if no engine specified, act like normal requests
         if self.dbs['engine'] is None: return self.get_www(url)
 
-        res = None
+        db_res = []
+        www_res = []
         force_new = (max_age_days<1)
-        if not force_new: 
-            res = self.get_db(url)
-            if res is not None:
-                if res.status_code == 404 or\
-                    res.date_created < (datetime.today() - timedelta(days=max_age_days)): 
-                    force_new = True
+
+        db_res = self.get_db(url)
+        if len(db_res):
+            # check date created of most recent `get` to see if want to get a newer one
+            if db_res[0].status_code == 404 or\
+                db_res[0].date_created < (datetime.today() - timedelta(days=max_age_days)): 
+                force_new = True
                 
-        if res is None or force_new:
-            log.info("Not found in database, getting from web")
-            res = self.get_www(url)
-            self.save_db(res)
-        return res
-    
+        if force_new or not len(db_res):
+            log.info("Getting from www")
+            www_res = self.get_www(url)
+            www_res.headers['final_url'] = www_res.url
+            www_res.url = url
+            self.save_db(www_res)
+            www_res = [www_res]
+
+        return www_res + db_res
+        
     def post(self, url, data:dict, request_headers=None, force_new=False):
 
         # if no engine specified, act like normal requests
