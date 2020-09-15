@@ -5,7 +5,7 @@ import logging
 from typing import List, Dict
 import time, json
 from datetime import datetime, timedelta
-import boto3
+import boto3, botocore
 import boto3.session
 
 logging.basicConfig()
@@ -14,8 +14,10 @@ log = logging.getLogger()
 def default_engine(host):
     return db.create_engine(host, poolclass=db.pool.NullPool)
 
+client_config = botocore.config.Config(max_pool_connections=100,)
+
 aws_session = boto3.session.Session(profile_name=os.getenv('AWSACC'))
-s3 = aws_session.client('s3')
+s3 = aws_session.client('s3', config=client_config)
 
 def read_aws(bucket, k):
     obj = s3.get_object(Bucket=bucket, Key=k)
