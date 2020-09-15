@@ -147,20 +147,27 @@ class CReq():
         pages = self.dbs['pages']
         self.dbs['engine'].dispose()
         url_save = res.post_url if hasattr(res,'post_url') else res.url
-        with self.dbs['engine'].connect() as connection: 
-            query = db.insert(pages).values(url=url_save, status=res.status_code, 
-            headers=dict(res.headers), 
-            post_msg=db.null() if post_msg is None else json.dumps(post_msg, sort_keys=True)).returning(pages.columns.id)
-            trans = connection.begin()
+        while True:
             try:
-                dres = connection.execute(query)
-                id_save = dres.fetchone()[0]
-                write_aws(self.bucket, str(id_save)+'.gz.html',res.content)                
-                trans.commit()
-            except:
-                log.warning(f"ID {str(id_save)} could not save, will not commit to db.")
-                trans.rollback()
-                raise
+                with self.dbs['engine'].connect() as connection: 
+                    query = db.insert(pages).values(url=url_save, status=res.status_code, 
+                    headers=dict(res.headers), 
+                    post_msg=db.null() if post_msg is None else json.dumps(post_msg, sort_keys=True)).returning(pages.columns.id)
+                    trans = connection.begin()
+                    try:
+                        dres = connection.execute(query)
+                        id_save = dres.fetchone()[0]
+                        write_aws(self.bucket, str(id_save)+'.gz.html',res.content)                
+                        trans.commit()
+                    except:
+                        log.warning(f"ID {str(id_save)} could not save, will not commit to db.")
+                        trans.rollback()
+                        raise
+                break
+            except db.exc.OperationalError as e:
+                log.warning("Database connection lost, trying again")
+                time.sleep(1)
+        
         return None
     
     def get(self, url, max_age_days=365) -> List[object]:
