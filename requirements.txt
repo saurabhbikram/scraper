@@ -3,3 +3,4 @@ s3fs
 psycopg2-binary
 boto3
 botocore
+awscli
