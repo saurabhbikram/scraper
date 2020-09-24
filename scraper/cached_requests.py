@@ -129,7 +129,6 @@ class CReq():
                 elif db_headers['content-type'].find('json') > 0:
                     content_ext = 'json'
                 else:
-                    log.warning(f"extension {db_headers['content-type']} not implemented, saving wihout extension")
                     content_ext = ""
             else:
                 content_ext = "html"
@@ -210,7 +209,8 @@ class CReq():
         res = None
         if not force_new: 
             res = self.get_db(url, post_msg=data)
-            if res is not None and res.status_code == 404: force_new = True
+            if not len(res) or res[0].status_code == 404: force_new = True
+            else: res = res[0]
         if res is None or force_new:
             log.info("Not found in database, getting from web")
             res = self.post_www(url, data=data, request_headers=request_headers)
