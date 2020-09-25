@@ -83,13 +83,13 @@ class CReq():
             try:
                 with self.requests_session as s:
                     s.headers = request_headers
-                    s.proxies = self.get_proxy()
+                    pxy = self.get_proxy()
+                    s.proxies = pxy
                     r = s.post(url, data = data, headers=request_headers)
                 
                 # check if status is good
                 if r.status_code != 404: r.raise_for_status()                                    
                 break
-
             except (requests.exceptions.ProxyError, requests.exceptions.HTTPError, requests.exceptions.SSLError, requests.exceptions.ChunkedEncodingError) as e:
                     log.warning(f"Get {num_tries+1}/10 failed with proxy on {url} and proxy {pxy['http']}")
                     num_tries += 1
