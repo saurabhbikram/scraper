@@ -70,11 +70,10 @@ class CReq():
                 break
             except (requests.exceptions.ProxyError, requests.exceptions.HTTPError, 
                     requests.exceptions.SSLError, requests.exceptions.ChunkedEncodingError) as e:
-                log.warning(f"Get {num_tries+1}/10 failed with proxy on {url} and proxy {pxy['http']}")
                 num_tries += 1
-                if num_tries == 9:
+                if num_tries == 100:
                     raise
-                time.sleep(1*num_tries) # increasing sleep time for each fail
+                
         return res
 
     def post_www(self, url, data, request_headers=None):
@@ -91,10 +90,8 @@ class CReq():
                 if r.status_code != 404: r.raise_for_status()                                    
                 break
             except (requests.exceptions.ProxyError, requests.exceptions.HTTPError, requests.exceptions.SSLError, requests.exceptions.ChunkedEncodingError) as e:
-                    log.warning(f"Get {num_tries+1}/10 failed with proxy on {url} and proxy {pxy['http']}")
                     num_tries += 1
-                    if num_tries == 9: raise
-                    time.sleep(1*num_tries) # increasing sleep time for each fail
+                    if num_tries == 100: raise
         return r
 
     def get_db_id(self, url, post_msg=None):
