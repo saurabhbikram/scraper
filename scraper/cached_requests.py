@@ -20,27 +20,14 @@ aws_session = boto3.session.Session(profile_name=os.getenv('AWSACC'))
 s3 = aws_session.client('s3', config=client_config)
 
 def read_aws(bucket, k):
-    for i in range(5):
-        try:
-            obj = s3.get_object(Bucket=bucket, Key=k)
-            break
-        except botocore.exceptions.ClientError:
-            if i == 4: raise
-            pass
+    obj = s3.get_object(Bucket=bucket, Key=k)
     with gzip.GzipFile(fileobj=obj["Body"]) as gzipfile:
         content = gzipfile.read()
     return content
 
 def write_aws(bucket, k, content):
     res_gz = gzip.compress(content)
-    for i in range(5):
-        try:
-            res = s3.put_object(Body=res_gz, Bucket=bucket, Key=k)
-            break
-        except botocore.exceptions.ClientError:
-            if i == 4: raise
-            pass
-            
+    res = s3.put_object(Body=res_gz, Bucket=bucket, Key=k)
     assert res['ResponseMetadata']['HTTPStatusCode'] == 200
 
 class DBRequests:
