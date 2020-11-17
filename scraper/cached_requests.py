@@ -40,8 +40,9 @@ class DBRequests:
         self.date_created = date_created
 
 class CReq():
-    def __init__(self, engine: db.engine=None, bucket: str="sbcrawl-test", proxies: List[str]=None):
+    def __init__(self, engine: db.engine=None, bucket: str="sbcrawl-test", proxies: List[str]=None, max_tries=100):
         super().__init__()
+        self.max_tries = max_tries
         self.dbs = {'engine':engine}
         if engine is not None:
             self.dbs['metadata'] = db.MetaData()
@@ -71,7 +72,7 @@ class CReq():
             except (requests.exceptions.ProxyError, requests.exceptions.HTTPError, 
                     requests.exceptions.SSLError, requests.exceptions.ChunkedEncodingError) as e:
                 num_tries += 1
-                if num_tries == 100:
+                if num_tries == self.max_tries:
                     raise
                 
         return res
@@ -91,7 +92,7 @@ class CReq():
                 break
             except (requests.exceptions.ProxyError, requests.exceptions.HTTPError, requests.exceptions.SSLError, requests.exceptions.ChunkedEncodingError) as e:
                     num_tries += 1
-                    if num_tries == 100: raise
+                    if num_tries == self.max_tries: raise
         return r
 
     def get_db_id(self, url, post_msg=None):
